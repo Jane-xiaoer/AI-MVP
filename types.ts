@@ -1,3 +1,4 @@
+
 export interface Artwork {
   id: number | string;
   title: string;
@@ -10,4 +11,17 @@ export enum AppStep {
   SELECT_ART,
   GENERATING,
   RESULT,
+}
+
+export type Language = 'en' | 'zh';
+
+export interface EditOptions {
+  baseImage: string;
+  textPrompt?: string;
+  frameMaterial?: string;
+  mountingMethod?: string;
+  glazingType?: string;
+  frameColor?: string;
+  maskImage?: string;
+  newArtworkImage?: string;
 }

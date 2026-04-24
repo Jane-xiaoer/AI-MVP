@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import { UploadIcon } from './icons/UploadIcon';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface ImageUploaderProps {
   image: string | null;
@@ -11,6 +12,7 @@ interface ImageUploaderProps {
 export const ImageUploader: React.FC<ImageUploaderProps> = ({ image, onImageUpload, isLoading }) => {
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const t = useTranslation();
 
   const handleFileChange = useCallback((file: File | null) => {
     if (file && file.type.startsWith('image/')) {
@@ -53,7 +55,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ image, onImageUplo
 
   return (
     <div
-      className={`relative w-full aspect-video border-2 border-dashed rounded-xl flex flex-col items-center justify-center transition-all duration-300 ${isDragging ? 'border-teal-400 bg-teal-50' : 'border-gray-300 hover:border-teal-400 bg-white'}`}
+      className={`relative w-full aspect-video border border-white/60 rounded-2xl flex flex-col items-center justify-center transition-all duration-300 bg-white/50 ${isDragging ? 'border-white bg-white/70' : 'hover:border-white/90'}`}
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
       onDragOver={onDragOver}
@@ -69,24 +71,24 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ image, onImageUplo
         disabled={isLoading}
       />
       {isLoading && (
-        <div className="absolute inset-0 bg-white bg-opacity-80 flex flex-col items-center justify-center rounded-xl z-10">
-          <div className="w-12 h-12 border-4 border-dashed rounded-full animate-spin border-teal-500"></div>
-          <p className="mt-4 text-gray-600">Creating design rendering...</p>
+        <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-2xl z-10">
+          <div className="w-12 h-12 border-4 border-dashed rounded-full animate-spin border-slate-600"></div>
+          <p className="mt-4 text-slate-600">{t('enhancing_space')}</p>
         </div>
       )}
       {image && !isLoading ? (
-        <img src={image} alt="Room preview" className="object-contain w-full h-full rounded-lg" />
+        <img src={image} alt="Room preview" className="object-contain w-full h-full rounded-2xl" />
       ) : (
         !image && !isLoading && (
-          <div className="text-center text-gray-500 p-4 cursor-pointer">
+          <div className="text-center text-slate-600 p-4 cursor-pointer">
             <UploadIcon />
-            <p className="mt-2 font-semibold">Click to upload or drag & drop</p>
-            <p className="text-sm">PNG, JPG, WEBP recommended</p>
+            <p className="mt-2 font-medium">{t('upload_prompt')}</p>
+            <p className="text-sm">{t('upload_formats')}</p>
           </div>
         )
       )}
        {image && isLoading && (
-         <img src={image} alt="Room preview" className="object-contain w-full h-full rounded-lg opacity-30" />
+         <img src={image} alt="Room preview" className="object-contain w-full h-full rounded-2xl opacity-30" />
        )}
     </div>
   );

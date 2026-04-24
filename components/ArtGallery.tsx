@@ -1,65 +1,103 @@
 
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useState } from 'react';
 import type { Artwork } from '../types';
 import { UploadIcon } from './icons/UploadIcon';
+import { XIcon } from './icons/XIcon';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface ArtGalleryProps {
-  artworks: Artwork[];
-  selectedArtId?: number | string | null;
-  onArtSelect: (artwork: Artwork) => void;
-  onUserArtUpload: (base64Image: string) => void;
+  artwork: Artwork | null;
+  onArtUpload: (base64Image: string) => void;
+  onRemoveArt: () => void;
+  canUpload: boolean;
 }
 
-export const ArtGallery: React.FC<ArtGalleryProps> = ({ artworks, selectedArtId, onArtSelect, onUserArtUpload }) => {
+export const ArtGallery: React.FC<ArtGalleryProps> = ({ 
+  artwork, 
+  onArtUpload, 
+  onRemoveArt,
+  canUpload
+}) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const t = useTranslation();
 
-  const handleFileChange = useCallback((file: File | null) => {
-    if (file && file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        onUserArtUpload(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+  const handleFileChange = useCallback((files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    const imageFile = Array.from(files).find(file => file.type.startsWith('image/'));
+    if (!imageFile) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      onArtUpload(reader.result as string);
+    };
+    reader.readAsDataURL(imageFile);
+    
+  }, [onArtUpload]);
+
+  const onDragEnter = (e: React.DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); };
+  const onDragLeave = (e: React.DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); };
+  const onDragOver = (e: React.DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); };
+  const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFileChange(e.dataTransfer.files);
     }
-  }, [onUserArtUpload]);
-
-  const handleUploadClick = () => {
-    fileInputRef.current?.click();
   };
 
+  const handleUploadClick = () => {
+    if (canUpload) {
+      fileInputRef.current?.click();
+    }
+  };
+  
   return (
-    <div className="bg-white border border-gray-300 rounded-xl p-4 w-full h-[300px] md:h-full overflow-y-auto">
+    <div 
+      className="w-full h-full flex flex-col space-y-3 p-1 bg-transparent rounded-lg"
+      onDragEnter={canUpload ? onDragEnter : undefined}
+      onDragLeave={canUpload ? onDragLeave : undefined}
+      onDragOver={canUpload ? onDragOver : undefined}
+      onDrop={canUpload ? onDrop : undefined}
+    >
       <input
         ref={fileInputRef}
         type="file"
         accept="image/*"
         className="hidden"
-        onChange={(e) => handleFileChange(e.target.files ? e.target.files[0] : null)}
+        disabled={!canUpload}
+        onChange={(e) => {
+          handleFileChange(e.target.files);
+          if(e.target) e.target.value = '';
+        }}
       />
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        {/* Upload Card */}
-        <div
+      {!artwork ? (
+        <div 
+          className={`w-full h-full flex-grow border border-white/60 rounded-2xl flex flex-col items-center justify-center transition-all duration-300 ${!canUpload ? 'bg-white/30 cursor-not-allowed opacity-70' : `cursor-pointer ${isDragging ? 'border-white bg-white/70' : 'hover:border-white/90 bg-white/50'}`}`}
           onClick={handleUploadClick}
-          className="relative rounded-lg overflow-hidden cursor-pointer group transform hover:scale-105 transition-transform duration-300 border-2 border-dashed border-gray-400 hover:border-teal-500 flex flex-col items-center justify-center text-gray-500 hover:text-teal-500 aspect-square"
         >
-          <UploadIcon />
-          <p className="mt-1 text-xs font-semibold text-center px-1">Upload Your Art</p>
-        </div>
-
-        {/* Gallery Items */}
-        {artworks.map((art) => (
-          <div
-            key={art.id}
-            className={`relative rounded-lg overflow-hidden cursor-pointer group transform hover:scale-105 transition-transform duration-300 ${selectedArtId === art.id ? 'ring-4 ring-offset-2 ring-teal-500' : ''}`}
-            onClick={() => onArtSelect(art)}
-          >
-            <img src={art.imageUrl} alt={art.title} className="w-full h-full object-cover aspect-square" />
-            <div className="absolute inset-0 bg-black bg-opacity-40 group-hover:bg-opacity-20 transition-all duration-300 flex items-end p-2">
-              <p className="text-white text-xs font-semibold">{art.title}</p>
-            </div>
+          <div className="text-center text-slate-600 p-4">
+              <UploadIcon />
+              <p className="mt-2 font-medium">{t('upload_artwork_prompt')}</p>
+              <p className="text-sm">{t('upload_formats')}</p>
           </div>
-        ))}
-      </div>
+        </div>
+      ) : (
+        <div className="w-full h-full flex items-center justify-center p-4">
+            <div className="relative group w-3/4 max-w-[200px] aspect-square">
+                <img src={artwork.imageUrl} alt={artwork.title} className="w-full h-full object-contain rounded-lg shadow-md" />
+                <button 
+                    onClick={onRemoveArt}
+                    className="absolute -top-2 -right-2 bg-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:scale-110"
+                    aria-label="Remove image"
+                >
+                    <XIcon className="w-5 h-5 text-slate-800" />
+                </button>
+            </div>
+        </div>
+      )}
     </div>
   );
 };

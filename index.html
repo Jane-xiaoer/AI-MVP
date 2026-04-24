@@ -1,11 +1,25 @@
-
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Art Interior Designer</title>
+    <title>Your Home Art Show</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              'sans': ['Inter', 'sans-serif'],
+              'serif': ['Playfair Display', 'serif'],
+            },
+          },
+        },
+      }
+    </script>
   <script type="importmap">
 {
   "imports": {
@@ -17,7 +31,7 @@
 }
 </script>
 </head>
-  <body class="bg-gray-100 text-gray-800">
+  <body class="bg-gradient-to-br from-[#FDEFF9] via-[#E8ECFF] to-[#E3F6FF] text-slate-800 font-sans">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

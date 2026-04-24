@@ -1,5 +1,5 @@
 {
-  "name": "AI Art Interior Designer",
-  "description": "An AI agent that visualizes how artworks look in your home. Upload a photo of your room, select a piece of art, and let the AI generate a realistic rendering of the art on your wall.",
+  "name": "Your Art Gallery",
+  "description": "打造您的私人美术馆。上传空间照片和艺术作品,看看效果吧。",
   "requestFramePermissions": []
 }
