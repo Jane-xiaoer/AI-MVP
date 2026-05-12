@@ -1,10 +1,11 @@
 
-import React, { useState, useCallback, useContext } from 'react';
+import React, { useState, useCallback, useContext, useEffect } from 'react';
 import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
 import { ArtGallery } from './components/ArtGallery';
 import { ResultDisplay } from './components/ResultDisplay';
 import { LoadingIndicator } from './components/LoadingIndicator';
+import { SettingsModal } from './components/SettingsModal';
 import { AppStep, Artwork, EditOptions } from './types';
 import { AGENT_STEPS } from './locales';
 import { placeArtworkInRoom, editArtworkInRoom } from './services/geminiService';
@@ -12,6 +13,7 @@ import { LanguageContext } from './context/LanguageContext';
 import { useTranslation } from './hooks/useTranslation';
 import { resizeArtworkToMatchRoom } from './utils/imageUtils';
 import { MAX_ARTWORKS } from './constants';
+import { currentMode, readMasterKey, readUserApiKey, type AccessMode } from './lib/settings';
 
 const App: React.FC = () => {
   const [step, setStep] = useState<AppStep>(AppStep.UPLOAD_HOME);
@@ -21,6 +23,10 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [artwork, setArtwork] = useState<Artwork | null>(null);
+  const [mode, setMode] = useState<AccessMode>('free');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  useEffect(() => { setMode(currentMode()); }, []);
 
   const { language, setLanguage } = useContext(LanguageContext);
   const t = useTranslation();
@@ -184,13 +190,22 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen text-slate-800 flex flex-col items-center p-4 sm:p-6 md:p-8">
-      <Header 
+      <Header
         currentLang={language}
         onLangChange={setLanguage}
+        mode={mode}
+        onOpenSettings={() => setIsSettingsOpen(true)}
       />
       <main className="flex flex-col items-center justify-center w-full flex-grow text-center mt-8">
         {renderContent()}
       </main>
+      <SettingsModal
+        open={isSettingsOpen}
+        initialMasterKey={readMasterKey()}
+        initialUserApiKey={readUserApiKey()}
+        onClose={() => setIsSettingsOpen(false)}
+        onSaved={setMode}
+      />
     </div>
   );
 };

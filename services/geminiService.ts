@@ -1,23 +1,55 @@
 
-import { GoogleGenAI, Modality } from "@google/genai";
 import { EditOptions } from '../types';
 import { resizeArtworkToMatchRoom } from '../utils/imageUtils';
+import { readMasterKey, readUserApiKey } from '../lib/settings';
 
-function fileToGenerativePart(base64: string) {
-    const PURE_BASE64_REGEX = /^data:image\/(?:jpeg|png|webp|gif);base64,(.*)$/;
-    const match = base64.match(PURE_BASE64_REGEX);
-    if (!match) {
-        throw new Error("无效的 base64 图像格式");
-    }
-    const data = match[1];
-    const mimeType = base64.substring(5, base64.indexOf(';'));
+const MODEL = 'gemini-2.5-flash-image-preview';
 
-    return {
-        inlineData: {
-            data,
-            mimeType,
-        },
-    };
+// Convert a `data:image/...;base64,XXX` string to the shape that /api/generate expects.
+function dataUrlToImagePart(base64: string): { image: { base64: string; mimeType: string } } {
+  const PURE_BASE64_REGEX = /^data:image\/(?:jpeg|png|webp|gif);base64,(.*)$/;
+  const match = base64.match(PURE_BASE64_REGEX);
+  if (!match) {
+    throw new Error("无效的 base64 图像格式");
+  }
+  return {
+    image: {
+      base64: match[1],
+      mimeType: base64.substring(5, base64.indexOf(';')),
+    },
+  };
+}
+
+async function callGenerate(parts: Array<{ text: string } | { image: { base64: string; mimeType: string } }>): Promise<string> {
+  const masterKey = readMasterKey();
+  const userApiKey = readUserApiKey();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (masterKey)  headers['x-master-key']   = masterKey;
+  if (userApiKey) headers['x-user-api-key'] = userApiKey;
+
+  let resp: Response;
+  try {
+    resp = await fetch('/api/generate', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ model: MODEL, parts }),
+    });
+  } catch (e) {
+    throw new Error('网络请求失败,请检查连接');
+  }
+
+  let data: any;
+  try { data = await resp.json(); }
+  catch { throw new Error('服务器返回异常'); }
+
+  if (resp.status === 429 || data?.error === 'rate_limit') {
+    throw new Error(data?.message || '今天免费试用次数用完了,请填写主密码或自己的 API Key');
+  }
+  if (!resp.ok || !data?.ok) {
+    throw new Error(data?.message || data?.error || '生成失败');
+  }
+  if (!data.image) throw new Error('未收到图像数据');
+  return data.image as string;
 }
 
 const SINGLE_ARTWORK_PROMPT = `## 任务：替换艺术品
@@ -48,34 +80,12 @@ const SINGLE_ARTWORK_PROMPT = `## 任务：替换艺术品
 - 只输出修改后的图像，不含任何文字。`;
 
 export const placeArtworkInRoom = async (roomImageBase64: string, artImageBase64s: string[]): Promise<string> => {
-  if (!process.env.API_KEY) {
-    throw new Error("未配置 Gemini API Key。请联系应用管理员。");
-  }
-  try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const roomPart = fileToGenerativePart(roomImageBase64);
-    const artParts = artImageBase64s.map(art => fileToGenerativePart(art));
-    
-    const prompt = SINGLE_ARTWORK_PROMPT;
-    
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image-preview',
-      contents: { parts: [ roomPart, ...artParts, { text: prompt } ] },
-      config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
-    });
-
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData) {
-        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-      }
-    }
-
-    throw new Error('AI 模型没有生成图像。模型可能返回了文本：' + response.text);
-
-  } catch (error) {
-    console.error("调用 Gemini API 时出错：", error);
-    throw new Error("生成图像失败。API Key 可能无效或服务暂时不可用。");
-  }
+  const parts: Array<{ text: string } | { image: { base64: string; mimeType: string } }> = [
+    dataUrlToImagePart(roomImageBase64),
+    ...artImageBase64s.map(dataUrlToImagePart),
+    { text: SINGLE_ARTWORK_PROMPT },
+  ];
+  return callGenerate(parts);
 };
 
 const buildEditPrompt = (options: Omit<EditOptions, 'baseImage'>): string => {
@@ -134,44 +144,21 @@ const buildEditPrompt = (options: Omit<EditOptions, 'baseImage'>): string => {
 
 
 export const editArtworkInRoom = async (options: EditOptions): Promise<string> => {
-  if (!process.env.API_KEY) {
-    throw new Error("未配置 Gemini API Key。请联系应用管理员。");
+  const parts: Array<{ text: string } | { image: { base64: string; mimeType: string } }> = [];
+
+  parts.push(dataUrlToImagePart(options.baseImage));
+
+  if (options.newArtworkImage) {
+    const paddedArt = await resizeArtworkToMatchRoom(options.baseImage, options.newArtworkImage);
+    parts.push(dataUrlToImagePart(paddedArt));
   }
-  try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const parts: any[] = [];
 
-    parts.push(fileToGenerativePart(options.baseImage));
-
-    if (options.newArtworkImage) {
-      const paddedArt = await resizeArtworkToMatchRoom(options.baseImage, options.newArtworkImage);
-      parts.push(fileToGenerativePart(paddedArt));
-    }
-    
-    if (options.maskImage) {
-      parts.push(fileToGenerativePart(options.maskImage));
-    }
-    
-    const { baseImage, ...promptOptions } = options;
-    const prompt = buildEditPrompt(promptOptions);
-    parts.push({ text: prompt });
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image-preview',
-      contents: { parts },
-      config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
-    });
-
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData) {
-        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-      }
-    }
-
-    throw new Error('AI 模型未能编辑图像。模型可能返回了文本：' + response.text);
-
-  } catch (error) {
-    console.error("调用 Gemini API 进行编辑时出错：", error);
-    throw new Error("编辑图像失败。API Key 可能无效或服务暂时不可用。");
+  if (options.maskImage) {
+    parts.push(dataUrlToImagePart(options.maskImage));
   }
+
+  const { baseImage, ...promptOptions } = options;
+  parts.push({ text: buildEditPrompt(promptOptions) });
+
+  return callGenerate(parts);
 };
