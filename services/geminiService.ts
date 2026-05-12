@@ -3,7 +3,7 @@ import { EditOptions } from '../types';
 import { resizeArtworkToMatchRoom } from '../utils/imageUtils';
 import { readMasterKey, readUserApiKey } from '../lib/settings';
 
-const MODEL = 'gemini-2.5-flash-image-preview';
+const MODEL = 'gemini-3-pro-image-preview';
 
 // Convert a `data:image/...;base64,XXX` string to the shape that /api/generate expects.
 function dataUrlToImagePart(base64: string): { image: { base64: string; mimeType: string } } {
