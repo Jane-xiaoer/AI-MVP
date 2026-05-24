@@ -1,9 +1,4 @@
 
-/**
- * Loads an image from a base64 string.
- * @param base64 - The base64 string of the image.
- * @returns A promise that resolves with the loaded HTMLImageElement.
- */
 const loadImage = (base64: string): Promise<HTMLImageElement> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -11,6 +6,35 @@ const loadImage = (base64: string): Promise<HTMLImageElement> => {
     img.onerror = (err) => reject(err);
     img.src = base64;
   });
+};
+
+// Downscale + re-encode as JPEG so the request body stays under Vercel's 4.5MB
+// serverless function payload limit. Used for room photos, source artworks,
+// masks — anything that doesn't need transparency.
+export const compressToJpeg = async (
+  dataUrl: string,
+  maxDim = 1600,
+  quality = 0.85
+): Promise<string> => {
+  try {
+    const img = await loadImage(dataUrl);
+    const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.round(img.naturalWidth * scale);
+    const h = Math.round(img.naturalHeight * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return dataUrl;
+    // White background in case source has transparency — JPEG can't carry alpha.
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+    return canvas.toDataURL('image/jpeg', quality);
+  } catch (e) {
+    console.warn('compressToJpeg failed, sending original', e);
+    return dataUrl;
+  }
 };
 
 /**
@@ -54,8 +78,10 @@ export const resizeArtworkToMatchRoom = async (
       canvasWidth = artImg.naturalHeight * roomAspectRatio;
     }
 
-    canvas.width = canvasWidth;
-    canvas.height = canvasHeight;
+    const MAX_DIM = 1600;
+    const downscale = Math.min(1, MAX_DIM / Math.max(canvasWidth, canvasHeight));
+    canvas.width = Math.round(canvasWidth * downscale);
+    canvas.height = Math.round(canvasHeight * downscale);
 
     // Calculate dimensions to draw the artwork, maintaining its aspect ratio
     const scale = Math.min(

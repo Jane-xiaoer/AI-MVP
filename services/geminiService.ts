@@ -1,6 +1,6 @@
 
 import { EditOptions } from '../types';
-import { resizeArtworkToMatchRoom } from '../utils/imageUtils';
+import { resizeArtworkToMatchRoom, compressToJpeg } from '../utils/imageUtils';
 import { readMasterKey, readUserApiKey } from '../lib/settings';
 
 const MODEL = 'gemini-3-pro-image-preview';
@@ -80,9 +80,13 @@ const SINGLE_ARTWORK_PROMPT = `## 任务：替换艺术品
 - 只输出修改后的图像，不含任何文字。`;
 
 export const placeArtworkInRoom = async (roomImageBase64: string, artImageBase64s: string[]): Promise<string> => {
+  const [room, ...arts] = await Promise.all([
+    compressToJpeg(roomImageBase64),
+    ...artImageBase64s.map(b => compressToJpeg(b)),
+  ]);
   const parts: Array<{ text: string } | { image: { base64: string; mimeType: string } }> = [
-    dataUrlToImagePart(roomImageBase64),
-    ...artImageBase64s.map(dataUrlToImagePart),
+    dataUrlToImagePart(room),
+    ...arts.map(dataUrlToImagePart),
     { text: SINGLE_ARTWORK_PROMPT },
   ];
   return callGenerate(parts);
@@ -146,15 +150,18 @@ const buildEditPrompt = (options: Omit<EditOptions, 'baseImage'>): string => {
 export const editArtworkInRoom = async (options: EditOptions): Promise<string> => {
   const parts: Array<{ text: string } | { image: { base64: string; mimeType: string } }> = [];
 
-  parts.push(dataUrlToImagePart(options.baseImage));
+  const baseJpeg = await compressToJpeg(options.baseImage);
+  parts.push(dataUrlToImagePart(baseJpeg));
 
   if (options.newArtworkImage) {
+    // resizeArtworkToMatchRoom already caps output at 1600px and keeps PNG transparency.
     const paddedArt = await resizeArtworkToMatchRoom(options.baseImage, options.newArtworkImage);
     parts.push(dataUrlToImagePart(paddedArt));
   }
 
   if (options.maskImage) {
-    parts.push(dataUrlToImagePart(options.maskImage));
+    const maskJpeg = await compressToJpeg(options.maskImage);
+    parts.push(dataUrlToImagePart(maskJpeg));
   }
 
   const { baseImage, ...promptOptions } = options;
