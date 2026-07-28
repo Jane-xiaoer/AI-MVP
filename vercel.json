@@ -6,6 +6,9 @@
   "functions": {
     "api/generate.ts": {
       "maxDuration": 300
+    },
+    "api/upscale.ts": {
+      "maxDuration": 300
     }
   }
 }

@@ -1,6 +1,8 @@
 
 import React, { useState, useCallback, useContext, useEffect } from 'react';
 import { Header } from './components/Header';
+import { Hall, Exhibit } from './components/Hall';
+import { UpscaleStudio } from './components/UpscaleStudio';
 import { ImageUploader } from './components/ImageUploader';
 import { ArtGallery } from './components/ArtGallery';
 import { ResultDisplay } from './components/ResultDisplay';
@@ -17,6 +19,7 @@ import { currentMode, readMasterKey, readUserApiKey, type AccessMode } from './l
 
 const App: React.FC = () => {
   const [step, setStep] = useState<AppStep>(AppStep.UPLOAD_HOME);
+  const [view, setView] = useState<'hall' | Exhibit>('hall');
   const [homeImage, setHomeImage] = useState<string | null>(null);
   const [originalHomeImage, setOriginalHomeImage] = useState<string | null>(null);
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
@@ -195,9 +198,22 @@ const App: React.FC = () => {
         onLangChange={setLanguage}
         mode={mode}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onGoHall={() => setView('hall')}
+        showSettings={view === 'frame'}
       />
-      <main className="flex flex-col items-center justify-center w-full flex-grow text-center mt-8">
-        {renderContent()}
+      <main className="flex flex-col items-center justify-center w-full flex-grow text-center mt-10">
+        {view === 'hall' && <Hall onPick={(e) => setView(e)} />}
+        {view === 'upscale' && <UpscaleStudio />}
+        {view === 'frame' && (
+          <>
+            <div className="text-center mb-8">
+              <h1 className="font-serif text-4xl sm:text-5xl font-bold text-slate-900">{t('main_title')}</h1>
+              <h2 className="mt-3 text-2xl text-slate-700">{t('subtitle')}</h2>
+              <p className="mt-2 text-base text-slate-500">{t('description')}</p>
+            </div>
+            {renderContent()}
+          </>
+        )}
       </main>
       <SettingsModal
         open={isSettingsOpen}
