@@ -284,6 +284,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     await monthlyIncrBy(cfg.weight); // 已创建 = 会计费,记月度账
+    // 用量计数(给居家馆日报台账:累计 + 今日 + 各档今日)
+    if (HAS_REDIS) {
+      const day = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
+      const bump = (k: string) =>
+        fetch(`${UPSTASH_URL}/incr/${encodeURIComponent(k)}`, {
+          headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` },
+        }).catch(() => {});
+      try {
+        await Promise.all([
+          bump('home:upscale:total'),
+          bump(`home:upscale:${day}`),
+          bump(`home:upscale:${tierKey}:${day}`),
+        ]);
+      } catch { /* best-effort */ }
+    }
     return res.status(200).json({
       ok: true,
       id: pred.id,

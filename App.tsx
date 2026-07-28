@@ -28,8 +28,17 @@ const App: React.FC = () => {
   const [artwork, setArtwork] = useState<Artwork | null>(null);
   const [mode, setMode] = useState<AccessMode>('free');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [stats, setStats] = useState<{ total: number; upscales: number } | null>(null);
 
   useEffect(() => { setMode(currentMode()); }, []);
+
+  // 访客 + 超分用量(低调计数)
+  useEffect(() => {
+    fetch('/api/visit', { method: 'POST' })
+      .then((r) => r.json())
+      .then((d) => setStats({ total: Number(d.total || 0), upscales: Number(d.upscales || 0) }))
+      .catch(() => {});
+  }, []);
 
   const { language, setLanguage } = useContext(LanguageContext);
   const t = useTranslation();
@@ -215,6 +224,11 @@ const App: React.FC = () => {
           </>
         )}
       </main>
+      {stats && (stats.total > 0 || stats.upscales > 0) && (
+        <footer className="mt-8 text-[11px] text-slate-400/70 tracking-wide tabular-nums">
+          {t('stats_line', { v: stats.total.toLocaleString(), u: stats.upscales.toLocaleString() })}
+        </footer>
+      )}
       <SettingsModal
         open={isSettingsOpen}
         initialMasterKey={readMasterKey()}
